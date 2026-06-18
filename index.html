@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SPI語彙トレーナー</title>
+<style>
+  :root{--bg:#0f172a;--card:#1e293b;--card2:#334155;--accent:#38bdf8;--accent2:#22c55e;--danger:#f87171;--text:#e2e8f0;--sub:#94a3b8;--line:#475569;}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{margin:0;font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;padding:16px;max-width:680px;margin:0 auto;}
+  h1{font-size:1.3rem;margin:8px 0 4px;text-align:center;}
+  .sub{text-align:center;color:var(--sub);font-size:.85rem;margin-bottom:16px;}
+  .modes{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;justify-content:center;}
+  .modes button{flex:1;min-width:90px;padding:10px 8px;border:none;border-radius:10px;background:var(--card2);color:var(--text);font-size:.9rem;cursor:pointer;transition:.15s;}
+  .modes button.active{background:var(--accent);color:#0f172a;font-weight:700;}
+  .ranges{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;justify-content:center;align-items:center;}
+  .ranges .rlabel{font-size:.8rem;color:var(--sub);margin-right:2px;}
+  .ranges button{padding:6px 14px;border:1px solid var(--line);border-radius:99px;background:transparent;color:var(--sub);font-size:.85rem;cursor:pointer;transition:.15s;}
+  .ranges button.on{background:var(--accent);color:#0f172a;border-color:var(--accent);font-weight:700;}
+  .bar{height:8px;background:var(--card2);border-radius:99px;overflow:hidden;margin-bottom:6px;}
+  .bar>div{height:100%;background:var(--accent2);width:0;transition:.3s;}
+  .stat{display:flex;justify-content:space-between;font-size:.8rem;color:var(--sub);margin-bottom:16px;}
+  .card{background:var(--card);border-radius:16px;padding:28px 20px;min-height:230px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.3);}
+  .label{font-size:.75rem;color:var(--sub);letter-spacing:.1em;margin-bottom:10px;}
+  .meaning{font-size:1.25rem;font-weight:600;margin-bottom:8px;}
+  .usage{font-size:.85rem;color:var(--sub);margin-bottom:18px;}
+  .answer{font-size:2rem;font-weight:800;color:var(--accent);margin:6px 0;}
+  .reading{font-size:1rem;color:var(--accent2);margin-bottom:10px;}
+  .hint{font-size:.85rem;color:var(--sub);background:var(--card2);padding:10px 14px;border-radius:10px;margin-top:6px;max-width:100%;}
+  .btns{display:flex;gap:10px;margin-top:18px;width:100%;}
+  .btns button{flex:1;padding:14px;border:none;border-radius:12px;font-size:1rem;cursor:pointer;font-weight:700;transition:.15s;}
+  .show{background:var(--accent);color:#0f172a;}
+  .ng{background:var(--danger);color:#0f172a;}
+  .ok{background:var(--accent2);color:#0f172a;}
+  .choices{display:flex;flex-direction:column;gap:10px;width:100%;margin-top:18px;}
+  .choices button{padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--card2);color:var(--text);font-size:1.05rem;cursor:pointer;transition:.15s;text-align:center;}
+  .choices button.correct{background:var(--accent2);color:#0f172a;border-color:var(--accent2);}
+  .choices button.wrong{background:var(--danger);color:#0f172a;border-color:var(--danger);}
+  .choices button:disabled{cursor:default;opacity:.85;}
+  .next{margin-top:16px;width:100%;padding:14px;border:none;border-radius:12px;background:var(--accent);color:#0f172a;font-weight:700;font-size:1rem;cursor:pointer;}
+  .foot{display:flex;gap:8px;margin-top:14px;}
+  .foot button{flex:1;padding:8px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--sub);font-size:.8rem;cursor:pointer;}
+  .done{text-align:center;padding:40px 20px;}
+  .done .big{font-size:3rem;}
+  .empty{text-align:center;padding:40px 20px;color:var(--sub);}
+</style>
+</head>
+<body>
+  <h1>SPI語彙トレーナー</h1>
+  <div class="sub" id="sub">データ未登録</div>
+  <div class="modes">
+    <button data-mode="card" class="active">暗記カード</button>
+    <button data-mode="quiz">4択クイズ</button>
+    <button data-mode="weak">苦手のみ</button>
+  </div>
+  <div class="ranges" id="ranges"><span class="rlabel">範囲</span></div>
+  <div class="bar"><div id="progbar"></div></div>
+  <div class="stat"><span id="counter">0 / 0</span><span id="weakcount">苦手 0語</span></div>
+  <div id="stage"></div>
+  <div class="foot">
+    <button id="shuffleBtn">シャッフルして最初から</button>
+    <button id="resetWeak">苦手リセット</button>
+  </div>
+<script>
+const WORDS = [
+  {t:"照準",r:"しょうじゅん",m:"ねらいを定めること",u:"照準を合わせる",h:"",p:192},
+  {t:"蹂躙",r:"じゅうりん",m:"踏みにじったり侵害したりすること",u:"人権を蹂躙する",h:"躙＝ふみにじる",p:192},
+  {t:"苦笑",r:"くしょう",m:"怒りや不快感を持ちながらしかたなく笑うこと",u:"思わず苦笑する",h:"",p:192},
+  {t:"悠長",r:"ゆうちょう",m:"急を要するのに、急ごうとしない様子",u:"悠長に構えている",h:"",p:192},
+  {t:"強記",r:"きょうき",m:"記憶力が優れていること",u:"博覧強記",h:"博覧強記でセット",p:192},
+  {t:"領袖",r:"りょうしゅう",m:"ある集団を率いる人物",u:"派閥の領袖",h:"袖＝そで、リーダー",p:192},
+  {t:"垂涎",r:"すいぜん",m:"ある物をしきりに欲しがること",u:"垂涎の的",h:"涎＝よだれ",p:192},
+  {t:"刮目",r:"かつもく",m:"目をこすってよく見ること",u:"刮目に値する",h:"刮＝こする",p:192},
+  {t:"催事",r:"さいじ",m:"特別に行われるもよおし",u:"デパートの催事",h:"",p:192},
+  {t:"気鋭",r:"きえい",m:"意気込みが鋭いこと",u:"気鋭の評論家",h:"新進気鋭",p:192},
+  {t:"流布",r:"るふ",m:"世に広まること。広く知れ渡ること",u:"悪い噂が流布",h:"",p:192},
+  {t:"驚嘆",r:"きょうたん",m:"ひどく感心すること",u:"勇気に驚嘆した",h:"",p:192},
+  {t:"心服",r:"しんぷく",m:"心から尊敬して従うこと",u:"師として心服する",h:"",p:192},
+  {t:"敷衍",r:"ふえん",m:"言葉を加えてわかりやすく説明すること",u:"敷衍して説明する",h:"話を敷き広げる",p:192},
+  {t:"進取",r:"しんしゅ",m:"自ら進んで新しいことをすること",u:"進取の精神（⇔墨守）",h:"⇔墨守",p:192},
+  {t:"卓見",r:"たっけん",m:"優れた意見",u:"卓見を述べる",h:"卓越した意見",p:192},
+  {t:"参画",r:"さんかく",m:"計画段階から参加すること",u:"作成に参画する",h:"計画に画＝関わる",p:192},
+  {t:"克明",r:"こくめい",m:"細かいところまで念を入れて手落ちのないこと",u:"克明な記録",h:"細かく明らかに",p:192},
+  {t:"鎬",r:"しのぎ",m:"激しく争うこと（〜を削る）",u:"鎬を削る",h:"刀の鎬が削れるほど争う",p:192},
+  {t:"鳩首",r:"きゅうしゅ",m:"人々が集まって額を寄せ合い相談すること",u:"鳩首協議",h:"首(頭)を寄せ集める",p:192},
+  {t:"木鐸",r:"ぼくたく",m:"世の人を教え導く人。指導者",u:"社会の木鐸",h:"世論を導く言論人",p:192},
+  {t:"陥穽",r:"かんせい",m:"人をおとしいれるはかりごと。落とし穴",u:"陥穽にはまる",h:"陥＝おちいる",p:192},
+  {t:"義憤",r:"ぎふん",m:"不正なことにいきどおること",u:"義憤にかられる",h:"正義感からの怒り",p:192},
+  {t:"謳歌",r:"おうか",m:"恵まれた境遇を大いに楽しみ表現すること",u:"青春を謳歌",h:"",p:192},
+  {t:"粉飾",r:"ふんしょく",m:"立派に見せようとしてうわべを飾ること",u:"決算を粉飾",h:"粉飾決算",p:192},
+  {t:"因習",r:"いんしゅう",m:"古くから伝えられている（古い）風習",u:"因習を打ち破る",h:"",p:192},
+  {t:"大度",r:"たいど",m:"度量の大きいこと",u:"寛仁大度",h:"心が広く慈悲深い",p:192},
+  {t:"言下",r:"げんか",m:"言い終わるか終わらない時。即座",u:"言下に否定する",h:"言葉の下＝すぐ",p:192},
+  {t:"居丈高",r:"いたけだか",m:"人を威圧するような態度",u:"居丈高な態度",h:"",p:192},
+  {t:"踏襲",r:"とうしゅう",m:"それまでのやり方をそのまま引き継ぐこと",u:"方針を踏襲する",h:"踏む＋襲う",p:192},
+  {t:"梗概",r:"こうがい",m:"あらすじ",u:"戯曲の梗概を話す",h:"",p:193},
+  {t:"瞠目",r:"どうもく",m:"驚いたり感心したりして目をみはること",u:"瞠目すべき活躍",h:"瞠＝目をみはる",p:193},
+  {t:"保身",r:"ほしん",m:"自分の地位や名声などの安全をはかること",u:"保身に走る",h:"",p:193},
+  {t:"跳梁",r:"ちょうりょう",m:"勝手にはねまわること。悪がのさばること",u:"悪鬼が跳梁する",h:"跳梁跋扈",p:193},
+  {t:"履行",r:"りこう",m:"約束したことなどを実際に行うこと",u:"契約を履行する",h:"",p:193},
+  {t:"安閑",r:"あんかん",m:"安らかで静かなさま",u:"安閑としていられない",h:"",p:193},
+  {t:"私淑",r:"ししゅく",m:"ひそかに尊敬し、師と仰ぐこと",u:"漱石に私淑する",h:"密かに師と仰ぐ",p:193},
+  {t:"高尚",r:"こうしょう",m:"学問・言行などの程度が高く上品なこと",u:"高尚な趣味（⇔低俗）",h:"",p:193},
+  {t:"鼓舞",r:"こぶ",m:"励まして奮い立たせること",u:"士気を鼓舞する",h:"鼓を打って舞わせる",p:193},
+  {t:"即妙",r:"そくみょう",m:"気がきいていること",u:"当意即妙",h:"当意即妙",p:193},
+  {t:"崇高",r:"すうこう",m:"気高く尊いさま",u:"崇高な理想を抱く",h:"",p:193},
+  {t:"出仕",r:"しゅっし",m:"役所などに勤めること。官職につくこと",u:"官庁に出仕する",h:"",p:193},
+  {t:"射幸",r:"しゃこう",m:"偶然の利益や成功を当てにすること",u:"射幸心をあおる",h:"射幸心",p:193},
+  {t:"蔓延",r:"まんえん",m:"好ましくないことがはびこること",u:"汚職が蔓延している",h:"蔓が延びる",p:193},
+  {t:"落成",r:"らくせい",m:"工事が完了して建築物などができあがること",u:"新社屋が落成",h:"",p:193},
+  {t:"言外",r:"げんがい",m:"直接は言葉に出さない部分",u:"言外ににおわせる",h:"言葉の外",p:193},
+  {t:"膠着",r:"こうちゃく",m:"ある状態に固定して進展しないこと",u:"膠着した状態",h:"膠で着く",p:193},
+  {t:"言質",r:"げんち",m:"後で証拠となる言葉",u:"言質をとる",h:"言質をとる",p:193},
+  {t:"博覧",r:"はくらん",m:"広く一般の人が見ること",u:"博覧に供する",h:"",p:193},
+  {t:"画策",r:"かくさく",m:"ひそかに計画をめぐらすこと",u:"実現しようと画策する",h:"",p:193},
+  {t:"慇懃",r:"いんぎん",m:"礼儀正しいこと",u:"慇懃に答える",h:"慇懃無礼",p:193},
+  {t:"果断",r:"かだん",m:"ためらわずに思い切って行うさま",u:"果断な対応",h:"",p:193},
+  {t:"慧眼",r:"けいがん",m:"物事の本質を見抜く、優れた眼力",u:"慧眼の士",h:"慧＝かしこい",p:193},
+  {t:"省察",r:"せいさつ",m:"自身を反省して考えること",u:"自らの言動を省察する",h:"",p:193},
+  {t:"嘆息",r:"たんそく",m:"なげいて、ため息をつくこと",u:"嘆息をもらす",h:"",p:193},
+  {t:"意匠",r:"いしょう",m:"工夫をめぐらすこと。デザイン",u:"意匠を凝らす",h:"意匠を凝らす",p:193},
+  {t:"迎合",r:"げいごう",m:"相手に調子を合わせること。こびを売ること",u:"風潮に迎合する",h:"",p:193},
+  {t:"具備",r:"ぐび",m:"十分に備えていること",u:"条件を具備する",h:"",p:193},
+  {t:"銘記",r:"めいき",m:"心に刻み込むこと",u:"師の教えを銘記する",h:"銘＝刻む",p:193},
+  {t:"断腸",r:"だんちょう",m:"非常に辛いこと",u:"断腸の思いで手放す",h:"腸がちぎれる思い",p:193},
+  {t:"仮託",r:"かたく",m:"他の物事を借りて言い表す。かこつける",u:"神話に仮託して語る",h:"",p:193},
+  {t:"雄飛",r:"ゆうひ",m:"勢い盛んに活動すること",u:"海外に雄飛する（⇔雌伏）",h:"⇔雌伏",p:193},
+  {t:"晦日",r:"みそか",m:"月の最後の日",u:"晦日前で忙しい",h:"大晦日",p:193},
+  {t:"斟酌",r:"しんしゃく",m:"相手の事情や心情などをくみとること",u:"相手を斟酌する",h:"斟酌",p:193},
+  {t:"忖度",r:"そんたく",m:"相手の心中をおしはかること",u:"真意を忖度する",h:"",p:193},
+  {t:"不埒",r:"ふらち",m:"道理にはずれていて、けしからぬこと",u:"不埒な振る舞い",h:"埒＝区切り",p:193},
+  {t:"熱望",r:"ねつぼう",m:"心から願うこと。強く希望すること",u:"世界の平和を熱望する",h:"",p:194},
+  {t:"拮抗",r:"きっこう",m:"力がほぼ等しくて優劣のないこと",u:"勢力が拮抗する",h:"",p:194},
+  {t:"先達",r:"せんだつ",m:"先にその分野に進んで他を導く人",u:"先達に学ぶ",h:"",p:194},
+  {t:"督励",r:"とくれい",m:"監督し励ますこと。指図して元気づけること",u:"部下を督励する",h:"",p:194},
+  {t:"超然",r:"ちょうぜん",m:"俗事にこだわらず、ゆうゆうとしているさま",u:"超然とした態度",h:"",p:194},
+  {t:"杜撰",r:"ずさん",m:"いい加減。手抜き。おざなり",u:"杜撰な工事",h:"",p:194},
+  {t:"円熟",r:"えんじゅく",m:"十分に熟達して豊かな内容をもつこと",u:"円熟の境地",h:"",p:194},
+  {t:"老成",r:"ろうせい",m:"経験を積んで、円熟すること",u:"老成した文章",h:"",p:194},
+  {t:"詭弁",r:"きべん",m:"道理に合わない弁論",u:"詭弁を弄する",h:"詭＝あざむく",p:194},
+  {t:"至言",r:"しげん",m:"的を射た言葉。本質を突いた言葉",u:"けだし至言といえよう",h:"",p:194},
+  {t:"適宜",r:"てきぎ",m:"その場の状況に合っていること",u:"適宜対処する",h:"",p:194},
+  {t:"僭越",r:"せんえつ",m:"さしでがましいこと。出過ぎたこと",u:"僭越な言い方ですが",h:"",p:194},
+  {t:"裁量",r:"さいりょう",m:"本人の考えで判断、処理すること",u:"君の裁量に任せる",h:"",p:194},
+  {t:"気概",r:"きがい",m:"困難に負けない強い気性・意志",u:"戦う気概を示す",h:"",p:194},
+  {t:"笑殺",r:"しょうさつ",m:"問題にしないこと。一笑に付すこと",u:"意見が笑殺された",h:"",p:194},
+  {t:"希有",r:"けう",m:"めったにないこと",u:"希有な出来事",h:"稀有とも書く",p:194},
+  {t:"陶冶",r:"とうや",m:"性質や能力を円満に鍛え育てること",u:"人格を陶冶する",h:"",p:194},
+  {t:"逡巡",r:"しゅんじゅん",m:"決断できずにぐずぐずすること",u:"逡巡する間に機会を逃す",h:"",p:194},
+  {t:"証左",r:"しょうさ",m:"証拠。あかし",u:"景気回復の証左である",h:"",p:194},
+  {t:"気丈",r:"きじょう",m:"気持ちがしっかりしていること",u:"気丈に振る舞う",h:"",p:194},
+  {t:"早晩",r:"そうばん",m:"いずれ。遅かれ早かれ。近い将来",u:"早晩政権を取るだろう",h:"",p:194},
+  {t:"幇間",r:"ほうかん",m:"太鼓持ち。客の機嫌をとって場を盛り上げる職業",u:"座敷に幇間を呼ぶ",h:"たいこもち",p:194},
+  {t:"通暁",r:"つうぎょう",m:"すみずみまで詳しく知っていること",u:"その道に通暁する",h:"精通と同義",p:194},
+  {t:"姑息",r:"こそく",m:"その場しのぎの間に合わせ",u:"姑息な手段",h:"本来は一時しのぎ",p:194},
+  {t:"営営",r:"えいえい",m:"こつこつと励むさま。せっせと働く様子",u:"営営と仕事に励む",h:"",p:194},
+  {t:"恬淡",r:"てんたん",m:"欲がなくあっさりしているさま",u:"名利に恬淡な人物",h:"",p:194},
+  {t:"闊達",r:"かったつ",m:"度量が広く小事にこだわらないさま",u:"自由闊達な社風",h:"",p:194},
+  {t:"馴致",r:"じゅんち",m:"なれさせること。なじませること",u:"競走馬を馴致する",h:"",p:194},
+  {t:"卓越",r:"たくえつ",m:"他よりはるかに優れていること",u:"卓越した技術",h:"",p:194},
+  {t:"涵養",r:"かんよう",m:"水がしみこむように徐々に教え養うこと",u:"徳性の涵養を図る",h:"",p:194},
+  {t:"伝播",r:"でんぱ",m:"伝わり広がっていくこと",u:"文化が東へと伝播する",h:"でんぱんとも",p:194},
+  {t:"煌煌",r:"こうこう",m:"光り輝くさま",u:"煌煌と星が輝く",h:"",p:194},
+  {t:"秘匿",r:"ひとく",m:"秘密にして隠しておくこと",u:"情報元を秘匿する",h:"匿＝かくす",p:194},
+  {t:"奢侈",r:"しゃし",m:"過度のぜいたく。身分不相応なぜいたく",u:"奢侈にふける",h:"",p:194},
+  {t:"杞憂",r:"きゆう",m:"無用の心配。取り越し苦労",u:"杞憂にすぎない",h:"",p:194},
+  {t:"法外",r:"ほうがい",m:"並外れていて普通の程度をこえていること",u:"法外な要求",h:"",p:194},
+  {t:"滔々",r:"とうとう",m:"次から次へとよどみなく話すさま",u:"滔々と意見を述べる",h:"",p:195},
+  {t:"蜿蜒",r:"えんえん",m:"うねうねと長く続くさま",u:"蜿蜒と続く山並み",h:"≒延々",p:195},
+  {t:"疎通",r:"そつう",m:"意思や考えが支障なく相手に通じること",u:"意思の疎通を図る",h:"",p:195},
+  {t:"直言",r:"ちょくげん",m:"思うことを遠慮なく言うこと",u:"直言する",h:"",p:195},
+  {t:"進言",r:"しんげん",m:"上位の者に意見を申し述べること",u:"社長に進言する（＝具申）",h:"",p:195},
+  {t:"歴然",r:"れきぜん",m:"はっきりとして明白なさま",u:"歴然とした事実",h:"≒歴々",p:195},
+  {t:"恭順",r:"きょうじゅん",m:"つつしんで命令などに従うこと",u:"恭順の意を表する",h:"",p:195},
+  {t:"大綱",r:"たいこう",m:"事柄の根本。おおもと。大づかみの内容",u:"計画の大綱",h:"",p:195},
+  {t:"蹉跌",r:"さてつ",m:"物事がうまくいかず、しくじること。失敗",u:"事業が蹉跌する",h:"つまずくこと",p:195},
+  {t:"逓減",r:"ていげん",m:"だんだん少なくなること",u:"収穫量の逓減（＝漸減）",h:"逓＝次第に",p:195},
+  {t:"閨秀",r:"けいしゅう",m:"学問や芸術などに優れた女性",u:"閨秀作家",h:"",p:195},
+  {t:"意表",r:"いひょう",m:"まったく考えてもいないこと",u:"意表を突く",h:"意表を突く",p:195},
+  {t:"軋轢",r:"あつれき",m:"仲が悪くなること。不和",u:"軋轢が生じる",h:"車輪がきしむ",p:195},
+  {t:"労",r:"ろう",m:"苦労・努力。ほねおり",u:"労をねぎらう",h:"",p:195},
+  {t:"典拠",r:"てんきょ",m:"よりどころとなる文章。引用した資料",u:"典拠を脚注に示す",h:"",p:195},
+  {t:"枢軸",r:"すうじく",m:"物事の中心となる重要な部分",u:"国の枢軸にいる（＝枢要）",h:"枢＝かなめ",p:195},
+  {t:"泰斗",r:"たいと",m:"その道で最も権威のある人",u:"美術界の泰斗（＝大家）",h:"泰山北斗の略",p:195},
+  {t:"比肩",r:"ひけん",m:"同等のものとして並ぶこと。伍すること",u:"兄に比肩する（＝匹敵）",h:"肩を並べる",p:195},
+  {t:"傾注",r:"けいちゅう",m:"集中して取り組むこと",u:"創作に傾注する（＝没頭）",h:"",p:195},
+  {t:"懸案",r:"けんあん",m:"問題になっていながら解決がつかない事柄",u:"懸案事項",h:"",p:195},
+  {t:"宥和",r:"ゆうわ",m:"対立する相手をゆるし、仲よくすること",u:"宥和政策",h:"宥＝ゆるす",p:195},
+  {t:"遁走",r:"とんそう",m:"逃げ出すこと",u:"敵から遁走する",h:"遁＝のがれる",p:195},
+  {t:"虚心",r:"きょしん",m:"先入観を持たない、すなおな態度",u:"人の話を虚心に聞く",h:"虚心坦懐",p:195},
+  {t:"中原",r:"ちゅうげん",m:"天下の中央。中心の地",u:"中原を制する",h:"中原に鹿を逐う",p:195},
+  {t:"演繹",r:"えんえき",m:"一般論から個別のものを推論・説明すること",u:"定理から演繹する（⇔帰納）",h:"⇔帰納",p:195},
+  {t:"知遇",r:"ちぐう",m:"人格・能力を認められ厚く待遇されること",u:"知遇を得る",h:"",p:195},
+  {t:"失笑",r:"しっしょう",m:"思わず笑ってしまうこと",u:"発言が失笑を買った",h:"こらえきれず笑う",p:195},
+  {t:"斯界",r:"しかい",m:"この分野。この専門の方面",u:"斯界の権威",h:"斯＝この",p:195},
+  {t:"耽読",r:"たんどく",m:"夢中になって読みふけること",u:"小説を耽読する",h:"耽＝ふける",p:195},
+  {t:"着々",r:"ちゃくちゃく",m:"物事が予定通り順調に進むさま",u:"計画を着々と進める",h:"",p:195},
+  {t:"諸般",r:"しょはん",m:"さまざま。いろいろ",u:"諸般の事情により",h:"",p:195},
+  {t:"過般",r:"かはん",m:"先ごろ。この間",u:"過般の情勢を鑑み",h:"",p:195},
+  {t:"佳境",r:"かきょう",m:"物事の面白くなったところ。興味深い場面",u:"話が佳境に入る",h:"",p:195},
+  {t:"気脈",r:"きみゃく",m:"連絡。気持ちのつながり",u:"気脈を通ずる",h:"気脈を通ずる",p:195},
+  {t:"隠匿",r:"いんとく",m:"人に見つからないようにかくすこと",u:"政治資金を隠匿する",h:"匿＝かくす",p:195},
+  {t:"増長",r:"ぞうちょう",m:"だんだんいい気になってつけ上がること",u:"部下を増長させるな",h:"",p:196},
+  {t:"咽喉",r:"いんこう",m:"のど。転じて、重要な通路",u:"東西貿易の咽喉",h:"",p:196},
+  {t:"回顧",r:"かいこ",m:"過去をふりかえってみること",u:"昨年を回顧する",h:"",p:196},
+  {t:"看過",r:"かんか",m:"見過ごすこと",u:"看過できない大問題",h:"",p:196},
+  {t:"看破",r:"かんぱ",m:"真相などを見破ること。見抜くこと",u:"悪巧みを看破する",h:"",p:196},
+  {t:"打診",r:"だしん",m:"相手の反応を見るために事前に伝えること",u:"相手の意向を打診する",h:"",p:196},
+  {t:"標榜",r:"ひょうぼう",m:"主義・主張などを公然と表すこと",u:"民主主義を標榜する",h:"",p:196},
+  {t:"排斥",r:"はいせき",m:"好ましくないとして拒み退けること",u:"異民族を排斥する",h:"",p:196},
+  {t:"峻別",r:"しゅんべつ",m:"厳しく区別すること",u:"公私を峻別する",h:"峻＝きびしい",p:196},
+  {t:"吹聴",r:"ふいちょう",m:"言いふらすこと。言い広めること",u:"手柄を吹聴する",h:"読みに注意",p:196},
+  {t:"寡聞",r:"かぶん",m:"見聞が狭くて知識をもたないこと",u:"寡聞にして存じません",h:"寡＝少ない",p:196},
+  {t:"肝要",r:"かんよう",m:"非常に大切なこと",u:"辛抱が肝要だ",h:"肝心要",p:196},
+  {t:"消長",r:"しょうちょう",m:"衰えたり栄えたりすること",u:"文明の消長",h:"消える＋長じる",p:196},
+  {t:"遜色",r:"そんしょく",m:"見劣り（「遜色ない」で見劣りしない）",u:"遜色ない出来映え",h:"",p:196},
+  {t:"卑近",r:"ひきん",m:"身近でありふれていること",u:"卑近な例を挙げる",h:"",p:196},
+  {t:"腐心",r:"ふしん",m:"事を成し遂げようと心を痛め悩ますこと",u:"人気取りに腐心する",h:"",p:196},
+  {t:"内々",r:"ないない",m:"こっそり。うちわ。内密",u:"武器を内々に調達する",h:"",p:196},
+  {t:"憐憫",r:"れんびん",m:"かわいそうに思うこと",u:"憐憫の情を抱く",h:"憐＝あわれむ",p:196},
+  {t:"造詣",r:"ぞうけい",m:"その分野についての深い知識や優れた技量",u:"歌舞伎に造詣が深い",h:"造詣が深い",p:196},
+  {t:"閉口",r:"へいこう",m:"手に負えなくて困ること",u:"暑さに閉口する",h:"",p:196},
+  {t:"喧伝",r:"けんでん",m:"言いふらして広く知らせること",u:"広く喧伝された事件",h:"喧＝やかましい",p:196},
+  {t:"漸次",r:"ぜんじ",m:"だんだん。次第に",u:"漸次増加する",h:"漸＝次第に",p:196},
+  {t:"漸進",r:"ぜんしん",m:"だんだん、少しずつ進むこと",u:"漸進的な改革（⇔急進）",h:"⇔急進",p:196},
+  {t:"招致",r:"しょうち",m:"招き寄せること",u:"五輪を招致する",h:"",p:196},
+  {t:"委細",r:"いさい",m:"こまかく詳しいこと。物事の詳しい事情",u:"委細かまわず行う",h:"委細面談",p:196},
+  {t:"英気",r:"えいき",m:"何かをしようとする元気。優れた才気",u:"英気を養う",h:"英気を養う",p:196},
+  {t:"市井",r:"しせい",m:"人家が集まっている所。ちまた",u:"市井の人",h:"市井の人＝庶民",p:196},
+  {t:"披瀝",r:"ひれき",m:"気持ちなどを隠さずすべて打ち明けること",u:"本心を披瀝する",h:"",p:196},
+  {t:"露見",r:"ろけん",m:"隠れていた事実、真相が表に出ること",u:"正体が露見する",h:"",p:196},
+  {t:"謬見",r:"びゅうけん",m:"誤った意見、考え",u:"謬見を正す",h:"謬＝あやまり",p:196},
+  {t:"出色",r:"しゅっしょく",m:"他より目立って優れていること",u:"出色の出来映え",h:"",p:196},
+  {t:"異彩",r:"いさい",m:"普通とは異なっていて目立つ様子",u:"異彩を放つ",h:"異彩を放つ",p:196},
+  {t:"折衷",r:"せっちゅう",m:"それぞれのよいところをとって一つに合わせること",u:"両者の案を折衷する",h:"和洋折衷",p:196},
+  {t:"折半",r:"せっぱん",m:"二等分にすること。半分に分けること",u:"金を折半する",h:"半分に折る",p:196},
+  {t:"度外視",r:"どがいし",m:"まったく問題にしないこと。無視すること",u:"損得を度外視する",h:"",p:196},
+  {t:"辟易",r:"へきえき",m:"うんざりして嫌になること",u:"長話に辟易する",h:"",p:196},
+  {t:"八方手",r:"はっぽうて",m:"できる限りの手段をとること",u:"八方手を尽くす",h:"",p:197},
+  {t:"非",r:"ひ",m:"欠点がまったくないさま",u:"非のうちどころのない人",h:"非の打ち所がない",p:197},
+  {t:"独占",r:"どくせん",m:"ひとりじめすること",u:"利益を独占する",h:"",p:197},
+  {t:"遺漏",r:"いろう",m:"欠点や手抜かりがないさま",u:"遺漏のない説明",h:"",p:197},
+  {t:"期",r:"き",m:"完全な状態を目指して追い求めること",u:"完璧を期する",h:"",p:197},
+  {t:"糾明",r:"きゅうめい",m:"厳しく問いただし、とがめること",u:"不正を糾明する",h:"",p:197},
+  {t:"窮",r:"きゅう",m:"どうにもならなくなること",u:"進退窮まる",h:"",p:197},
+  {t:"一線",r:"いっせん",m:"はっきりと区別をつけること",u:"一線を画する",h:"",p:197},
+  {t:"返答",r:"へんとう",m:"どう対応してよいか迷うこと",u:"返答に困る",h:"",p:197},
+  {t:"愚に",r:"ぐに",m:"とりとめがない。たわいもない",u:"愚にもつかない",h:"",p:197},
+  {t:"断",r:"だん",m:"あまりにひどくて言葉で表せないこと",u:"言語道断",h:"",p:197},
+  {t:"千万",r:"せんばん",m:"非常にばかばかしいこと",u:"笑止千万",h:"",p:197},
+  {t:"乾燥",r:"かんそう",m:"おもしろみも味わいもないこと",u:"無味乾燥",h:"",p:197},
+  {t:"遺憾",r:"いかん",m:"非常に残念なこと",u:"遺憾千万",h:"",p:197},
+  {t:"変幻",r:"へんげん",m:"思いのままにあやつるさま",u:"変幻自在",h:"",p:197},
+  {t:"アプリオリ",r:"あぷりおり",m:"先天的。経験に先立つもの",u:"",h:"a priori",p:197},
+  {t:"アポステリオリ",r:"あぽすてりおり",m:"後天的。経験に基づくもの",u:"",h:"a posteriori",p:197},
+];
+
+const PAGES=[...new Set(WORDS.map(w=>w.p))].sort((a,b)=>a-b);
+const LS_WEAK="spi_weak_v3",LS_PAGES="spi_pages_v3";
+let mode="card",order=[],idx=0,quizAnswered=false;
+function loadWeak(){try{return new Set(JSON.parse(localStorage.getItem(LS_WEAK)||"[]"));}catch(e){return new Set();}}
+function saveWeak(s){localStorage.setItem(LS_WEAK,JSON.stringify([...s]));}
+let weak=loadWeak();
+function loadPages(){try{const a=JSON.parse(localStorage.getItem(LS_PAGES));return a&&a.length?new Set(a):new Set(PAGES);}catch(e){return new Set(PAGES);}}
+function savePages(s){localStorage.setItem(LS_PAGES,JSON.stringify([...s]));}
+let selPages=loadPages();
+selPages=new Set([...selPages].filter(p=>PAGES.includes(p)));
+if(selPages.size===0)selPages=new Set(PAGES);
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function buildOrder(){
+  if(mode==="weak"){order=WORDS.map((w,i)=>i).filter(i=>weak.has(WORDS[i].t));}
+  else{order=WORDS.map((w,i)=>i).filter(i=>selPages.has(WORDS[i].p));}
+  shuffle(order);idx=0;
+}
+function renderRanges(){
+  const box=document.getElementById("ranges");
+  box.innerHTML='<span class="rlabel">範囲</span>';
+  if(PAGES.length===0)return;
+  const allBtn=document.createElement("button");
+  allBtn.textContent="全て";allBtn.className=(selPages.size===PAGES.length)?"on":"";
+  allBtn.onclick=()=>{selPages=new Set(PAGES);savePages(selPages);renderRanges();buildOrder();render();};
+  box.appendChild(allBtn);
+  PAGES.forEach(p=>{
+    const b=document.createElement("button");
+    const n=WORDS.filter(w=>w.p===p).length;
+    b.textContent=`p${p}(${n})`;b.className=selPages.has(p)?"on":"";
+    b.onclick=()=>{if(selPages.has(p))selPages.delete(p);else selPages.add(p);if(selPages.size===0)selPages.add(p);savePages(selPages);renderRanges();buildOrder();render();};
+    box.appendChild(b);
+  });
+}
+function setMode(m){mode=m;document.querySelectorAll(".modes button").forEach(b=>b.classList.toggle("active",b.dataset.mode===m));buildOrder();render();}
+function updateStat(){
+  const total=order.length;
+  document.getElementById("counter").textContent=total?`${Math.min(idx+1,total)} / ${total}`:"0 / 0";
+  document.getElementById("progbar").style.width=total?`${(idx/total)*100}%`:"0%";
+  document.getElementById("weakcount").textContent=`苦手 ${weak.size}語`;
+}
+function markWeak(t,on){if(on)weak.add(t);else weak.delete(t);saveWeak(weak);}
+function render(){
+  updateStat();
+  const stage=document.getElementById("stage");
+  if(WORDS.length===0){stage.innerHTML=`<div class="card empty">語句がありません</div>`;return;}
+  if(order.length===0){stage.innerHTML=`<div class="card empty"><div class="meaning">${mode==="weak"?"苦手リストは空です🎉":"この範囲に語句がありません"}</div></div>`;return;}
+  if(idx>=order.length){stage.innerHTML=`<div class="card done"><div class="big">🎉</div><div class="meaning">${order.length}語 一周しました</div><div class="usage">下のボタンでもう一周 / 苦手のみ復習</div></div>`;document.getElementById("progbar").style.width="100%";return;}
+  const w=WORDS[order[idx]];
+  if(mode==="quiz")renderQuiz(w);else renderCard(w);
+}
+function renderCard(w){
+  const stage=document.getElementById("stage");
+  stage.innerHTML=`<div class="card"><div class="label">この意味の語句は？</div><div class="meaning">${w.m}</div><div class="usage">用例：${w.u?w.u.split(w.t).join("〇〇"):"—"}</div><div id="ansArea" style="display:none"><div class="answer">${w.t}</div><div class="reading">${w.r||""}</div>${w.u?`<div class="usage" style="margin-top:6px">用例：${w.u}</div>`:""}${w.h?`<div class="hint">💡 ${w.h}</div>`:""}</div><div class="btns" id="cardBtns"><button class="show" id="showBtn">答えを見る</button></div></div>`;
+  document.getElementById("showBtn").onclick=()=>{
+    document.getElementById("ansArea").style.display="block";
+    document.getElementById("cardBtns").innerHTML=`<button class="ng" id="ngBtn">できなかった</button><button class="ok" id="okBtn">できた</button>`;
+    document.getElementById("ngBtn").onclick=()=>{markWeak(w.t,true);idx++;render();};
+    document.getElementById("okBtn").onclick=()=>{markWeak(w.t,false);idx++;render();};
+  };
+}
+function renderQuiz(w){
+  quizAnswered=false;
+  const pool=WORDS.filter(x=>x.t!==w.t);shuffle(pool);
+  const opts=shuffle([w,pool[0],pool[1],pool[2]].filter(Boolean));
+  const stage=document.getElementById("stage");
+  stage.innerHTML=`<div class="card"><div class="label">この意味の語句は？</div><div class="meaning">${w.m}</div><div class="usage">用例：${w.u?w.u.split(w.t).join("〇〇"):"—"}</div><div class="choices" id="choices"></div><div id="qextra"></div></div>`;
+  const cont=document.getElementById("choices");
+  opts.forEach(o=>{
+    const b=document.createElement("button");
+    b.textContent=`${o.t}${o.r?`（${o.r}）`:""}`;
+    b.onclick=()=>{
+      if(quizAnswered)return;quizAnswered=true;
+      const all=cont.querySelectorAll("button");all.forEach(x=>x.disabled=true);
+      if(o.t===w.t){b.classList.add("correct");markWeak(w.t,false);}
+      else{b.classList.add("wrong");markWeak(w.t,true);all.forEach(x=>{if(x.textContent.startsWith(w.t+"（")||x.textContent===w.t)x.classList.add("correct");});}
+      document.getElementById("qextra").innerHTML=`${w.h?`<div class="hint">💡 ${w.h}</div>`:""}<button class="next" id="nextBtn">次へ</button>`;
+      document.getElementById("nextBtn").onclick=()=>{idx++;render();};
+    };
+    cont.appendChild(b);
+  });
+}
+document.querySelectorAll(".modes button").forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+document.getElementById("shuffleBtn").onclick=()=>{buildOrder();render();};
+document.getElementById("resetWeak").onclick=()=>{if(confirm("苦手リストを空にしますか？")){weak.clear();saveWeak(weak);if(mode==="weak")buildOrder();render();}};
+document.getElementById("sub").textContent=WORDS.length?`頻出語句 全${WORDS.length}語（p${PAGES[0]}–${PAGES[PAGES.length-1]}）`:"データ未登録";
+renderRanges();buildOrder();render();
+</script>
+</body>
+</html>

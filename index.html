@@ -332,6 +332,7 @@ function renderCard(w){
     document.getElementById("cardBtns").innerHTML=`<button class="ng" id="ngBtn">できなかった</button><button class="ok" id="okBtn">できた</button>`;
     document.getElementById("ngBtn").onclick=()=>{markWeak(w.t,true);idx++;render();};
     document.getElementById("okBtn").onclick=()=>{markWeak(w.t,false);idx++;render();};
+    document.getElementById("cardBtns").scrollIntoView({behavior:"smooth",block:"center"});
   };
 }
 function renderQuiz(w){
